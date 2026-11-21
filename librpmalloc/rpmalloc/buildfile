@@ -57,11 +57,16 @@ else
 
 # Export options.
 #
+# Besides the qualified <rpmalloc/rpmalloc.h>, also support the unqualified
+# <rpmalloc.h> and <rpnew.h> inclusion that upstream documents.
+#
 lib{rpmalloc}:
 {
-  c.export.poptions = "-I$out_root" "-I$src_root"
+  c.export.poptions = "-I$out_root" "-I$src_root" "-I$out_base" "-I$src_base"
   c.export.libs = $intf_libs
 }
+
+lib{rpmalloc}: c.pkgconfig.include = include/ include/rpmalloc/
 
 # For pre-releases use the complete version to make sure they cannot
 # be used in place of another pre-release or the final version. See
