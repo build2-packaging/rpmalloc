@@ -1,0 +1,30 @@
+import libs = librpmalloc%lib{rpmalloc}
+
+# If the library is built with the standard library override, also build the
+# override tests (as upstream's rpmalloc-test). Otherwise, build the
+# unmap_on_finalize tests instead (as upstream's rpmalloc-test-nooverride).
+#
+import! [metadata, rule_hint=cxx.link] rpmalloc = librpmalloc%lib{rpmalloc}
+
+override = $($rpmalloc: librpmalloc.override)
+
+exe{driver}: {h c}{**}
+exe{driver}: cxx{main-override}: include = $override
+exe{driver}: $libs testscript{**}
+
+# Upstream's test suite is a stress test tuned for optimized builds that runs
+# for minutes otherwise, so only build it.
+#
+exe{driver}: test = false
+
+c.poptions += "-I$src_base" -DRPMALLOC_TEST_OVERRIDE=($override ? 1 : 0)
+
+# As upstream, for sched_getaffinity() and CPU_COUNT() in main.c.
+#
+if ($c.target.class == 'linux' || $c.target.class == 'bsd')
+  c.poptions += -D_GNU_SOURCE=1
+
+# For pthread_create() in thread.c.
+#
+if ($c.target.class != 'windows')
+  cc.libs += -pthread
