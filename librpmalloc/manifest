@@ -1,15 +1,16 @@
 : 1
 name: librpmalloc
-version: 0.1.0-a.0.z
+version: 2.0.1-a.0.z
 language: c
 project: rpmalloc
-summary: General Purpose Memory Allocator
-license: MIT ; MIT License.
+summary: Lock-free thread-caching memory allocator C library
+license: Unlicense OR MIT
+topics: memory allocator, malloc replacement, thread caching
 description-file: README.md
 package-description-file: PACKAGE-README.md
 changes-file: CHANGELOG
-url: https://example.org/upstream
-email: upstream@example.org
+url: https://github.com/mjansson/rpmalloc
+email: mjansson@gmail.com
 package-url: https://github.com/build2-packaging/rpmalloc
 package-email: packaging@build2.org ; Mailing list.
 depends: * build2 >= 0.18.0
