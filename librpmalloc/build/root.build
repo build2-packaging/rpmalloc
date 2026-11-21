@@ -7,6 +7,29 @@ using c
 h{*}: extension = h
 c{*}: extension = c
 
+# Upstream compile-time feature switches (see README.md, "Configuration
+# options", and rpmalloc/rpmalloc.h). As upstream, leak detection follows
+# statistics unless the standard library override is enabled (see
+# rpmalloc/rpmalloc.c for details).
+#
+# The standard library override is disabled by default when targeting the
+# MSVC runtime: build2 links its DLL variant (/MD) by default and the
+# malloc() family imported from it cannot be overridden by linking
+# rpmalloc. Enable it when building with the static runtime (/MT).
+#
+config [bool] config.librpmalloc.override          ?= ($c.target.system != 'win32-msvc')
+config [bool] config.librpmalloc.first_class_heaps ?= false
+config [bool] config.librpmalloc.heap_statistics   ?= false
+config [bool] config.librpmalloc.statistics        ?= false
+config [bool] config.librpmalloc.leak_detection    ?= ($config.librpmalloc.statistics && \
+                                                       !$config.librpmalloc.override)
+config [bool] config.librpmalloc.validate_args     ?= false
+config [bool] config.librpmalloc.asserts           ?= false
+
+if $config.librpmalloc.leak_detection
+  assert $config.librpmalloc.statistics \
+    "config.librpmalloc.leak_detection requires config.librpmalloc.statistics"
+
 # The test target for cross-testing (running tests under Wine, etc).
 #
 test.target = $c.target

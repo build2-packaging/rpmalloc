@@ -55,15 +55,39 @@ else
     c.libs += advapi32.lib
 }
 
+# Feature switches (see build/root.build).
+#
+c.poptions += -DENABLE_OVERRIDE=($config.librpmalloc.override ? 1 : 0)                 \
+              -DENABLE_STATISTICS=($config.librpmalloc.statistics ? 1 : 0)             \
+              -DENABLE_LEAK_DETECTION=($config.librpmalloc.leak_detection ? 1 : 0)     \
+              -DENABLE_VALIDATE_ARGS=($config.librpmalloc.validate_args ? 1 : 0)       \
+              -DENABLE_ASSERTS=($config.librpmalloc.asserts ? 1 : 0)                   \
+              -DRPMALLOC_HEAP_STATISTICS=($config.librpmalloc.heap_statistics ? 1 : 0)
+
+# Also gates the rpmalloc_heap_*() declarations in rpmalloc.h and so must be
+# exported (see below).
+#
+first_class_heaps = ($config.librpmalloc.first_class_heaps ? 1 : 0)
+
+c.poptions += "-DRPMALLOC_FIRST_CLASS_HEAPS=$first_class_heaps"
+
 # Export options.
 #
 # Besides the qualified <rpmalloc/rpmalloc.h>, also support the unqualified
 # <rpmalloc.h> and <rpnew.h> inclusion that upstream documents.
 #
+# Also export the config.librpmalloc.override value as metadata (used by the
+# tests).
+#
 lib{rpmalloc}:
 {
+  export.metadata = 1 librpmalloc
+
   c.export.poptions = "-I$out_root" "-I$src_root" "-I$out_base" "-I$src_base"
+  c.export.poptions += "-DRPMALLOC_FIRST_CLASS_HEAPS=$first_class_heaps"
   c.export.libs = $intf_libs
+
+  librpmalloc.override = [bool] $config.librpmalloc.override
 }
 
 lib{rpmalloc}: c.pkgconfig.include = include/ include/rpmalloc/
