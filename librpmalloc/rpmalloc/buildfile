@@ -2,7 +2,11 @@ intf_libs = # Interface dependencies.
 impl_libs = # Implementation dependencies.
 #import xxxx_libs += libhello%lib{hello}
 
-lib{rpmalloc}: libul{rpmalloc}: {h c}{**} $impl_libs $intf_libs
+lib{rpmalloc}: libul{rpmalloc}: {h c}{** -malloc} $impl_libs $intf_libs
+
+# Included by rpmalloc.c.
+#
+libul{rpmalloc}: c{malloc}: include = adhoc
 
 libs{rpmalloc}: def{rpmalloc}: include = ($c.target.system == 'win32-msvc')
 def{rpmalloc}: libul{rpmalloc}
@@ -11,8 +15,45 @@ def{rpmalloc}: libul{rpmalloc}
 #
 c.poptions =+ "-I$out_root" "-I$src_root"
 
+# Initialize and finalize the allocator from DllMain() on Windows (see
+# malloc.c).
+#
+objs{*}: c.poptions += -DENABLE_DYNAMIC_LINK=1
+
 if ($c.target.system == 'mingw32')
   c.loptions += -Wl,--export-all-symbols
+
+# rpmalloc.c uses <stdatomic.h>, which requires C11, but build2 does not
+# translate c.std into an option for MSVC-class compilers. Older cl.exe
+# versions also gate C11 atomics behind /experimental:c11atomics (which
+# upstream's build/msvs/rpmalloc.vcxproj passes as well) while clang-cl
+# does not recognize it.
+#
+if ($c.class == 'msvc')
+{
+  c.coptions += /std:c11
+
+  if ($c.id == 'msvc')
+    c.coptions += /experimental:c11atomics
+}
+
+# As upstream, expose the madvise() flags and other extensions used by
+# rpmalloc.c regardless of the C dialect.
+#
+if ($c.target.class == 'linux' || $c.target.class == 'bsd')
+  c.poptions += -D_GNU_SOURCE=1
+
+if ($c.target.class != 'windows')
+  c.libs += -pthread
+else
+{
+  # For the large page privilege functions.
+  #
+  if ($c.target.system == 'mingw32')
+    c.libs += -ladvapi32
+  else
+    c.libs += advapi32.lib
+}
 
 # Export options.
 #
