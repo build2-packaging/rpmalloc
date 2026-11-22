@@ -1,0 +1,66 @@
+--- rpmalloc.c.orig	2026-11-21 21:23:15 +0100
++++ rpmalloc.c	2026-11-22 19:56:09 +0100
+@@ -747,7 +747,16 @@
+ #define TLS_MODEL __attribute__((tls_model("initial-exec")))
+ // #define TLS_MODEL
+ #endif
++//! GCC has no native thread-local storage on Apple platforms (nor on Windows before GCC 16) and emulates
++//  it, allocating the storage with malloc() or calloc() on first access. With the malloc override that
++//  allocation is our own and recurses back here, so keep the current thread heap in the pthread or FLS
++//  key instead
++#if (defined(__APPLE__) || defined(_WIN32)) && defined(__GNUC__) && !defined(__clang__)
++#define USE_KEY_THREAD_HEAP 1
++#else
++#define USE_KEY_THREAD_HEAP 0
+ static _Thread_local heap_t* global_thread_heap TLS_MODEL = &global_heap_fallback;
++#endif
+ 
+ static heap_t*
+ heap_allocate(int first_class);
+@@ -794,7 +803,9 @@
+ //! Set the current thread heap
+ static void
+ set_thread_heap(heap_t* heap) {
++#if !USE_KEY_THREAD_HEAP
+ 	global_thread_heap = heap;
++#endif
+ 	if (heap && (heap->id != 0)) {
+ 		rpmalloc_assert(heap->id != 0, "Default heap being used");
+ 		heap->owner_thread = get_thread_id();
+@@ -816,7 +827,24 @@
+ //! Get the current thread heap
+ static inline heap_t*
+ get_thread_heap(void) {
++#if USE_KEY_THREAD_HEAP
++	// The key only exists between rpmalloc_initialize and rpmalloc_finalize (and key 0 is the
++	// thread's own slot on Apple platforms)
++#if PLATFORM_WINDOWS
++	// FlsGetValue clears the last error, which callers of malloc do not expect
++	heap_t* heap = 0;
++	if (fls_key) {
++		DWORD last_error = GetLastError();
++		heap = (heap_t*)FlsGetValue(fls_key);
++		SetLastError(last_error);
++	}
++#else
++	heap_t* heap = pthread_key ? (heap_t*)pthread_getspecific(pthread_key) : 0;
++#endif
++	return heap ? heap : &global_heap_fallback;
++#else
+ 	return global_thread_heap;
++#endif
+ }
+ 
+ //! Get the size class from given size in bytes for tiny blocks (below 16 times the minimum granularity)
+@@ -2670,6 +2698,11 @@
+ 	// has not been called and shutdown is forced (through _exit) or unclean
+ 	if (get_thread_id() == global_main_thread_id)
+ 		return;
++#if USE_KEY_THREAD_HEAP && !PLATFORM_WINDOWS
++	// The key value is cleared before the destructor is called, restore it for the thread heap
++	if (value)
++		pthread_setspecific(pthread_key, value);
++#endif
+ 	if (value)
+ 		rpmalloc_thread_finalize();
+ }
