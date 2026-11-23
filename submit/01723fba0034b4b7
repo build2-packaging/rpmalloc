@@ -1,0 +1,7 @@
+: 1
+name: librpmalloc
+version: 2.0.1
+language: c
+project: rpmalloc
+summary: Lock-free thread-caching memory allocator C library
+license: Unlicense OR MIT
